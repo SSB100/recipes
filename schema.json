@@ -1,0 +1,662 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "parser_version",
+    "usage",
+    "rights_reference",
+    "record_count",
+    "recipes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "parser_version": {
+      "type": "string"
+    },
+    "usage": {
+      "enum": [
+        "synthetic",
+        "internal-sample",
+        "authorized"
+      ]
+    },
+    "rights_reference": {
+      "type": "string"
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recipes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recipe"
+      },
+      "maxItems": 20000
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pantri normalized offline recipe catalogue",
+  "description": "Output contract. Null is unknown or unavailable; see content_status and provenance. No live source collection is performed.",
+  "$defs": {
+    "ingredient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredient_id",
+        "position",
+        "original_text",
+        "quantity_text",
+        "unit",
+        "preparation",
+        "parse_status",
+        "source_name",
+        "canonical_name",
+        "canonical_match_status",
+        "quantity"
+      ],
+      "properties": {
+        "ingredient_id": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "original_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quantity_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preparation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parse_status": {
+          "enum": [
+            "source_structured",
+            "text_only_not_inferred",
+            "rule_parsed_reviewable"
+          ]
+        },
+        "source_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "canonical_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "canonical_match_status": {
+          "enum": [
+            "local_label_only_master_not_loaded",
+            "needs_form_review"
+          ]
+        },
+        "quantity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "position",
+        "section",
+        "name",
+        "text"
+      ],
+      "properties": {
+        "step_id": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "section": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rating_value",
+        "best_rating",
+        "worst_rating",
+        "rating_count",
+        "review_count"
+      ],
+      "properties": {
+        "rating_value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "best_rating": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "worst_rating": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "rating_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "review_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_url",
+        "source_file",
+        "source_file_sha256",
+        "source_record_index",
+        "captured_at",
+        "observed_on",
+        "capture_time_status",
+        "capture_method",
+        "source_freshness_note",
+        "permission_status",
+        "imported_at",
+        "parser_version",
+        "usage",
+        "rights_reference",
+        "text_rights_reference",
+        "field_provenance",
+        "source_page_sha256"
+      ],
+      "properties": {
+        "source_url": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "source_file_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_record_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "captured_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_on": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capture_time_status": {
+          "enum": [
+            "source_timestamp",
+            "exact_timestamp_unknown"
+          ]
+        },
+        "capture_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_freshness_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permission_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imported_at": {
+          "type": "string"
+        },
+        "parser_version": {
+          "type": "string"
+        },
+        "usage": {
+          "enum": [
+            "synthetic",
+            "internal-sample",
+            "authorized"
+          ]
+        },
+        "rights_reference": {
+          "type": "string"
+        },
+        "text_rights_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "field_provenance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fields",
+              "source_url",
+              "source_section",
+              "transformation"
+            ],
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source_url": {
+                "type": "string"
+              },
+              "source_section": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "transformation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "maxItems": 100
+        },
+        "source_page_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipe_id",
+        "canonical_url",
+        "source_id",
+        "title",
+        "categories",
+        "diets",
+        "servings",
+        "yield_text",
+        "timings",
+        "difficulty",
+        "ingredients",
+        "nutrition",
+        "aggregate_rating",
+        "allergens",
+        "allergen_status",
+        "description",
+        "method_summary",
+        "steps",
+        "content_status",
+        "dedup_hash",
+        "provenance",
+        "omitted_fields",
+        "validation"
+      ],
+      "properties": {
+        "recipe_id": {
+          "type": "string",
+          "pattern": "^cp_[0-9a-f]{16}$"
+        },
+        "canonical_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100
+        },
+        "diets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100
+        },
+        "servings": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "yield_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prep_minutes",
+            "cook_minutes",
+            "total_minutes"
+          ],
+          "properties": {
+            "prep_minutes": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cook_minutes": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "total_minutes": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "difficulty": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ingredient"
+          },
+          "maxItems": 500
+        },
+        "nutrition": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "basis": {
+                  "type": "string"
+                },
+                "calories": {
+                  "type": "string"
+                },
+                "carbohydrateContent": {
+                  "type": "string"
+                },
+                "carbohydrate_g": {
+                  "type": "string"
+                },
+                "cholesterolContent": {
+                  "type": "string"
+                },
+                "energy_kcal": {
+                  "type": "string"
+                },
+                "energy_kj": {
+                  "type": "string"
+                },
+                "fatContent": {
+                  "type": "string"
+                },
+                "fat_g": {
+                  "type": "string"
+                },
+                "fiberContent": {
+                  "type": "string"
+                },
+                "fibre_g": {
+                  "type": "string"
+                },
+                "proteinContent": {
+                  "type": "string"
+                },
+                "protein_g": {
+                  "type": "string"
+                },
+                "salt_g": {
+                  "type": "string"
+                },
+                "saturatedFatContent": {
+                  "type": "string"
+                },
+                "saturated_fat_g": {
+                  "type": "string"
+                },
+                "servingSize": {
+                  "type": "string"
+                },
+                "sodiumContent": {
+                  "type": "string"
+                },
+                "sodium_mg": {
+                  "type": "string"
+                },
+                "sugarContent": {
+                  "type": "string"
+                },
+                "sugar_g": {
+                  "type": "string"
+                },
+                "transFatContent": {
+                  "type": "string"
+                },
+                "unsaturatedFatContent": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "aggregate_rating": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/rating"
+            }
+          ]
+        },
+        "allergens": {
+          "type": "null"
+        },
+        "allergen_status": {
+          "const": "not_inferred_or_validated"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method_summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          },
+          "maxItems": 300
+        },
+        "content_status": {
+          "enum": [
+            "not_imported_requires_authorized_text",
+            "authorized_text_imported",
+            "authorized_text_requested_but_absent"
+          ]
+        },
+        "dedup_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "omitted_fields": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "by_policy",
+            "input_keys_discarded_by_policy"
+          ],
+          "properties": {
+            "by_policy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "input_keys_discarded_by_policy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "warnings",
+            "source_notes"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "valid",
+                "review_required"
+              ]
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "source_notes": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

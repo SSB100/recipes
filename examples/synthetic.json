@@ -1,0 +1,51 @@
+{
+  "purpose": "SYNTHETIC TEST DATA ONLY; no live observations",
+  "recipes": [
+    {
+      "canonical_url": "https://recipes.example.test/synthetic-lentil-bowl",
+      "title": "SYNTHETIC DEMO: Lentil Bowl",
+      "categories": [
+        "Synthetic demonstration"
+      ],
+      "diets": [
+        "Synthetic source label only"
+      ],
+      "servings": 2,
+      "timings": {
+        "prep_minutes": 10,
+        "cook_minutes": null,
+        "total_minutes": 30
+      },
+      "difficulty": "Easy",
+      "ingredients": [
+        {
+          "name": "Synthetic lentils",
+          "original_text": "200g Synthetic lentils",
+          "quantity_text": "200",
+          "unit": "g",
+          "preparation": "rinsed"
+        }
+      ],
+      "aggregate_rating": {
+        "rating_value": 4.2,
+        "best_rating": 5,
+        "rating_count": 10
+      },
+      "nutrition": null,
+      "captured_at": null,
+      "description": "Self-authored synthetic test description, intentionally omitted by default.",
+      "steps": [
+        {
+          "text": "Self-authored synthetic step one, intentionally omitted by default."
+        },
+        {
+          "text": "Self-authored synthetic step two, intentionally omitted by default."
+        }
+      ],
+      "provenance": {
+        "capture_method": "Self-authored synthetic fixture; not a live source observation.",
+        "permission_status": "Synthetic content authored for this example."
+      }
+    }
+  ]
+}

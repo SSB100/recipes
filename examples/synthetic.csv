@@ -1,0 +1,2 @@
+canonical_url,title,ingredients,categories,servings,prep_minutes,total_minutes
+https://recipes.example.test/synthetic-lentil-bowl,SYNTHETIC CSV DEMO,"[{""name"": ""Synthetic lentils"", ""original_text"": ""200g Synthetic lentils"", ""quantity_text"": ""200"", ""unit"": ""g"", ""preparation"": ""rinsed""}]","[""Synthetic demonstration""]",2,10,30

@@ -1,0 +1,20 @@
+name: Offline importer tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile and test with runner Python
+        run: |
+          python3 --version
+          python3 -m py_compile importer.py collector.py
+          python3 -m unittest discover -s tests -v
