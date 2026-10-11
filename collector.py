@@ -7,9 +7,11 @@ import email.utils
 import hashlib
 import json
 import math
+import os
 import re
 import sys
 import time
+import tempfile
 import urllib.error
 import urllib.request
 import urllib.robotparser
@@ -28,6 +30,7 @@ USER_AGENT = "PantriRecipeCollector/1.0"
 MAX_RESPONSE = 5 * 1024 * 1024
 MAX_URLS = 10000
 MAX_SITEMAPS = 100
+ROBOTS_CACHE_TTL_SECONDS = 600
 
 
 def safe_url(url):
@@ -57,8 +60,13 @@ class SameOriginRedirect(urllib.request.HTTPRedirectHandler):
         # Never follow a recipe into sign-in, payment or unrelated account routes.
         if urlsplit(req.full_url).path.startswith("/recipes/"):
             recipe_url(target)
-        if self.client and self.client.robot and not self.client.robot.can_fetch(USER_AGENT,target):
-            raise importer.ImportProblem("robots_disallows_redirect_target")
+        if self.client and self.client.robot:
+            parsed=urlsplit(target)
+            origin=parsed.scheme+"://"+parsed.netloc
+            if origin!=self.client.robot_origin:
+                self.client.load_robots(origin)
+            if not self.client.robot.can_fetch(USER_AGENT,target):
+                raise importer.ImportProblem("robots_disallows_redirect_target")
         return super().redirect_request(req, fp, code, msg, headers, target)
 
 
@@ -69,10 +77,18 @@ class PublicClient:
         self.delay, self.retries, self.last_request = delay, retries, 0.0
         self.opener = urllib.request.build_opener(SameOriginRedirect(self))
         self.robot = None
+        self.robot_origin = None
         self.requests = 0
+        self.robots_cache_path = None
+        self.robots_cache_payload = None
+        self.robots_cache_old_hash = None
 
     def get(self, url, robots_request=False):
         url = safe_url(url)
+        parsed=urlsplit(url)
+        requested_origin=parsed.scheme+"://"+parsed.netloc
+        if not robots_request and self.robot is not None and requested_origin!=self.robot_origin:
+            self.load_robots(requested_origin)
         if not robots_request and (self.robot is None or not self.robot.can_fetch(USER_AGENT, url)):
             raise importer.ImportProblem("robots_disallows_url")
         for attempt in range(self.retries + 1):
@@ -125,11 +141,39 @@ class PublicClient:
                 time.sleep(max(self.delay, 2 ** (attempt + 2)))
         raise importer.ImportProblem("retry_limit")
 
-    def load_robots(self):
-        text, url = self.get(ORIGIN + "/robots.txt", robots_request=True)
+    def load_robots(self, origin=ORIGIN):
+        url=safe_url(origin+"/robots.txt")
+        self.robot,self.robot_origin=None,None
+        text = None
+        cache = self.robots_cache_path
+        if cache is not None and cache.exists():
+            importer.reject_symlink_ancestors(cache)
+            if not cache.is_file() or cache.stat().st_size>1024*1024:
+                raise importer.ImportProblem("robots_cache_invalid")
+            raw=cache.read_bytes()
+            self.robots_cache_old_hash=importer.digest(raw)
+            saved=importer.parse_json(raw.decode("utf-8"))
+            if not isinstance(saved,dict) or saved.get("kind")!="pantri-public-robots-cache" or not isinstance(saved.get("text"),str) or saved.get("text_sha256")!=importer.digest(saved["text"].encode()) or type(saved.get("fetched_unix")) not in (float,int):
+                raise importer.ImportProblem("robots_cache_invalid")
+            age=time.time()-saved["fetched_unix"]
+            if not math.isfinite(age) or age<0:
+                raise importer.ImportProblem("robots_cache_clock_invalid")
+            if saved.get("origin")==origin and saved.get("user_agent")==USER_AGENT and age<ROBOTS_CACHE_TTL_SECONDS:
+                text=saved["text"]
+        if text is None:
+            # Expired/mismatched caches are refreshed, never used after a fetch error.
+            text, url = self.get(url, robots_request=True)
+            if len(text.encode())>512*1024:
+                raise importer.ImportProblem("robots_text_size_limit")
+            if re.search(r"<\s*(?:html|title)\b",text,re.I):
+                raise importer.ImportProblem("robots_html_response_stop")
+            self.robots_cache_payload={"kind":"pantri-public-robots-cache","origin":origin,"user_agent":USER_AGENT,
+                "fetched_unix":time.time(),"ttl_seconds":ROBOTS_CACHE_TTL_SECONDS,"text":text,"text_sha256":importer.digest(text.encode())}
+            self.persist_robots_cache()
         robot = urllib.robotparser.RobotFileParser(url)
         robot.parse(text.splitlines())
         self.robot = robot
+        self.robot_origin = origin
         delay = robot.crawl_delay(USER_AGENT)
         rate = robot.request_rate(USER_AGENT)
         if delay:
@@ -138,7 +182,28 @@ class PublicClient:
             self.delay = max(self.delay, rate.seconds / rate.requests)
         if self.delay > 300:
             raise importer.ImportProblem("robots_rate_requires_manual_scheduling")
-        return [safe_url(url) for url in (robot.site_maps() or [ORIGIN + "/sitemap.xml"])], importer.digest(text.encode())
+        return [safe_url(url) for url in (robot.site_maps() or [origin + "/sitemap.xml"])], importer.digest(text.encode())
+
+    def persist_robots_cache(self):
+        path=self.robots_cache_path
+        if path is None or self.robots_cache_payload is None or not path.parent.is_dir():
+            return
+        payload=(json.dumps(self.robots_cache_payload,indent=2)+"\n").encode()
+        importer.reject_symlink_ancestors(path)
+        if not path.exists():
+            importer.atomic_new_file(path,payload)
+        else:
+            if self.robots_cache_old_hash is None or importer.digest(path.read_bytes())!=self.robots_cache_old_hash:
+                raise importer.ImportProblem("robots_cache_changed_do_not_overwrite")
+            fd,temp=tempfile.mkstemp(prefix=".robots-",dir=path.parent)
+            try:
+                with os.fdopen(fd,"wb") as stream:
+                    stream.write(payload);stream.flush();os.fsync(stream.fileno())
+                os.replace(temp,path)
+            finally:
+                if os.path.exists(temp):os.unlink(temp)
+        self.robots_cache_old_hash=importer.digest(payload)
+        self.robots_cache_payload=None
 
 
 def sitemap_links(text):
@@ -372,6 +437,7 @@ def collect(args):
         raise importer.ImportProblem("collection_output_parent_missing")
     config = {"collector_version":VERSION,"rights_reference":args.rights_reference,"text_rights_reference":args.text_rights_reference}
     client = PublicClient(args.delay_seconds, args.retries)
+    client.robots_cache_path=output / "robots-cache.json"
     initial, robots_hash = client.load_robots()
     if output.exists():
         if not args.resume:
@@ -409,6 +475,7 @@ def collect(args):
         queue_payload=(json.dumps({"discovered_count":len(urls),"urls":urls,"sitemaps":sitemaps},indent=2)+"\n").encode()
         importer.atomic_new_file(output / "queue.json",queue_payload)
         importer.atomic_new_file(output / "run-config.json",(json.dumps({**config,"queue_sha256":importer.digest(queue_payload)},indent=2)+"\n").encode())
+        getattr(client,"persist_robots_cache",lambda:None)()
     queue, records, errors = urls[:args.limit], [], []
     record_dir = output / "records"
     for index, url in enumerate(queue, 1):
@@ -440,6 +507,16 @@ def collect(args):
                 break
     snapshot=output / "snapshots" / str(time.time_ns())
     snapshot.mkdir(mode=0o700)
+    if getattr(args,"checkpoint_only",False):
+        complete=len(records)==len(queue) and not errors
+        checkpoint={"collector_version":VERSION,"snapshot_type":"checkpoint_only","complete":complete,
+            "rights_reference":args.rights_reference,"text_rights_reference":args.text_rights_reference,
+            "robots_sha256":robots_hash,"discovered_count":len(urls),"selected_count":len(queue),
+            "accepted_count":len(records),"errors":errors,"http_requests":client.requests,
+            "effective_delay_seconds":client.delay,"record_storage":"Hash-verified per-recipe records; no duplicate catalogue export in this checkpoint."}
+        importer.atomic_new_file(snapshot / "collection-manifest.json",(json.dumps(checkpoint,indent=2)+"\n").encode())
+        print(json.dumps({"status":"complete" if complete else "stopped_for_review","checkpoint_only":True,"discovered":len(urls),"selected":len(queue),"accepted":len(records),"errors":errors,"snapshot":str(snapshot)}),flush=True)
+        return 0 if complete else 2
     source_exports=[]
     exports={}
     for start in range(0,len(records),200):
@@ -474,6 +551,7 @@ def main(argv=None):
     parser.add_argument("--text-rights-reference",required=True)
     parser.add_argument("--limit",type=int,default=25,help="Default pilot: 25 public recipe pages; max 10,000")
     parser.add_argument("--resume",action="store_true",help="Verify cached records and continue the saved queue without refetching successful pages")
+    parser.add_argument("--checkpoint-only",action="store_true",help="Save records and a compact checkpoint; omit repeated full exports until a later snapshot run")
     parser.add_argument("--urls-file",type=Path,help="Optional private list of approved public recipe URLs")
     parser.add_argument("--delay-seconds",type=float,default=2.0,help="At least two seconds; robots may require longer")
     parser.add_argument("--retries",type=int,default=2,choices=range(0,3))

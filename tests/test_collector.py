@@ -71,6 +71,42 @@ class CollectorTests(unittest.TestCase):
     def test_unsafe_rate_refused(self):
         with self.assertRaises(importer.ImportProblem):collector.PublicClient(delay=0)
 
+    def test_robots_cache_expiry_changed_rules_and_fetch_failure(self):
+        allowed='User-agent: *\nAllow: /\n'
+        denied='User-agent: *\nDisallow: /recipes/\n'
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'robots-cache.json'
+            first=collector.PublicClient();first.robots_cache_path=path
+            with patch.object(first,'get',return_value=(allowed,collector.ORIGIN+'/robots.txt')) as request,patch('collector.time.time',return_value=10000):
+                first.load_robots();self.assertEqual(request.call_count,1)
+            second=collector.PublicClient();second.robots_cache_path=path
+            with patch.object(second,'get',side_effect=AssertionError('Fresh cache should not fetch')),patch('collector.time.time',return_value=10001):
+                second.load_robots();self.assertTrue(second.robot.can_fetch(collector.USER_AGENT,collector.ORIGIN+'/recipes/synthetic-test'))
+            expired=collector.PublicClient();expired.robots_cache_path=path
+            with patch.object(expired,'get',side_effect=importer.ImportProblem('synthetic_fetch_error')),patch('collector.time.time',return_value=10601):
+                with self.assertRaises(importer.ImportProblem):expired.load_robots()
+                self.assertIsNone(expired.robot)
+            changed=collector.PublicClient();changed.robots_cache_path=path
+            with patch.object(changed,'get',return_value=(denied,collector.ORIGIN+'/robots.txt')),patch('collector.time.time',return_value=10602):
+                changed.load_robots();self.assertFalse(changed.robot.can_fetch(collector.USER_AGENT,collector.ORIGIN+'/recipes/synthetic-test'))
+
+    def test_robots_cache_different_origin_is_refetched(self):
+        text='User-agent: *\nAllow: /\n'
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'robots-cache.json'
+            first=collector.PublicClient();first.robots_cache_path=path
+            with patch.object(first,'get',return_value=(text,collector.ORIGIN+'/robots.txt')),patch('collector.time.time',return_value=10000):first.load_robots()
+            other=collector.PublicClient();other.robots_cache_path=path
+            with patch.object(other,'get',return_value=(text,'https://cherrypick.co/robots.txt')) as request,patch('collector.time.time',return_value=10001):
+                other.load_robots('https://cherrypick.co');self.assertEqual(request.call_count,1)
+                self.assertEqual(other.robot_origin,'https://cherrypick.co')
+
+    def test_robots_html_response_fails_closed(self):
+        client=collector.PublicClient()
+        with patch.object(client,'get',return_value=('<html><title>Access denied</title></html>',collector.ORIGIN+'/robots.txt')):
+            with self.assertRaisesRegex(importer.ImportProblem,'robots_html'):client.load_robots()
+        self.assertIsNone(client.robot)
+
     def test_unicode_and_mixed_fractions(self):
         for value,expected in [('¼',0.25),('½',0.5),('1½',1.5),('1 1/2',1.5),('1/4',0.25)]:
             row=collector.parse_ingredient_text(value+' Synthetic Cabbage')
@@ -109,6 +145,25 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(collector.collect(args),2)
             self.assertEqual(client.calls.count(first),1)
             self.assertEqual(client.calls.count(second),1)
+
+    def test_compact_checkpoint_can_be_exported_later(self):
+        url='https://www.cherrypick.co/recipes/synthetic-test'
+        class FakeClient:
+            delay=2.0
+            requests=0
+            def load_robots(self):return [],'0'*64
+            def get(self,u):self.requests+=1;return synthetic_html(),u
+        client=FakeClient()
+        with tempfile.TemporaryDirectory() as temp,patch.object(collector,'PublicClient',return_value=client),patch.object(collector,'discover',return_value=([url],[])),redirect_stdout(io.StringIO()):
+            args=Namespace(output=Path(temp)/'collection',limit=1,resume=False,urls_file=None,rights_reference='Synthetic collection',text_rights_reference='Synthetic prose',delay_seconds=2.0,retries=0,checkpoint_only=True)
+            self.assertEqual(collector.collect(args),0)
+            snap=next((args.output/'snapshots').iterdir())
+            self.assertEqual(json.loads((snap/'collection-manifest.json').read_text())['snapshot_type'],'checkpoint_only')
+            self.assertFalse((snap/'normalized').exists())
+            args.resume=True;args.checkpoint_only=False
+            self.assertEqual(collector.collect(args),0)
+            self.assertEqual(client.requests,1)
+            self.assertEqual(len(list((args.output/'snapshots').glob('*/normalized/catalogue.json'))),1)
 
 
 if __name__=='__main__':unittest.main()
